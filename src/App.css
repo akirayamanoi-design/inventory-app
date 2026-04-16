@@ -91,4 +91,6 @@ tbody td { padding: 9px 10px; vertical-align: middle; }
 .suggest-box { position: absolute; top: 100%; left: 0; right: 0; background: #fff; border: 1px solid #d0cfc7; border-radius: 8px; z-index: 10; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,.1); }
 .suggest-item { padding: 8px 12px; cursor: pointer; font-size: 13px; }
 .suggest-item:hover { background: #f5f4f0; }
+.btn:disabled, .btn.primary:disabled { background: #d0cfc7; color: #888; cursor: not-allowed; opacity: .7; }
+.success-msg { color: #059669; font-weight: 600; font-size: 13px; padding: 8px 10px; margin-top: 8px; background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 8px; }
 @media (max-width: 600px) { .topbar h1 { font-size: 17px; } .stats { grid-template-columns: repeat(2, 1fr); } .field-row { grid-template-columns: 1fr; } .master-tabs { flex-wrap: wrap; } table { font-size: 12px; } thead th:nth-child(4), tbody td:nth-child(4) { display: none; } .action-cell { flex-wrap: wrap; } }

@@ -31,6 +31,8 @@ export default function App() {
   const [newLoc, setNewLoc] = useState('')
   const [nameSuggest, setNameSuggest] = useState([])
   const [masterTab, setMasterTab] = useState('category')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [hasSubmitted, setHasSubmitted] = useState(false)
 
   const fetchAll = useCallback(async () => {
     setLoading(true)
@@ -84,6 +86,7 @@ export default function App() {
   }, [scanTarget])
 
   const saveItem = async () => {
+    if (isSubmitting || hasSubmitted) return
     if (!form.name.trim()) { alert('\u7269\u54c1\u540d\u306f\u5fc5\u9808\u3067\u3059'); return }
     const data = {
       bc: form.bc || '',
@@ -93,17 +96,36 @@ export default function App() {
       price: parseInt(form.price) || 0,
       note: form.note.trim()
     }
-    if (editItem) {
-      const { error } = await supabase.from('items').update(data).eq('id', editItem.id)
-      if (error) { alert('\u66f4\u65b0\u30a8\u30e9\u30fc: ' + error.message); return }
-    } else {
-      const { error } = await supabase.from('items').insert(data)
-      if (error) { alert('\u767b\u9332\u30a8\u30e9\u30fc: ' + error.message); return }
+    setIsSubmitting(true)
+    try {
+      if (editItem) {
+        const { error } = await supabase.from('items').update(data).eq('id', editItem.id)
+        if (error) { alert('\u66f4\u65b0\u30a8\u30e9\u30fc: ' + error.message); return }
+        setShowEdit(false); setEditItem(null)
+        setForm({ bc: '', name: '', cat: '', loc: '', price: 0, note: '' })
+        setNameSuggest([])
+      } else {
+        const { error } = await supabase.from('items').insert(data)
+        if (error) { alert('\u767b\u9332\u30a8\u30e9\u30fc: ' + error.message); return }
+        setHasSubmitted(true)
+      }
+      fetchAll()
+    } finally {
+      setIsSubmitting(false)
     }
+  }
+
+  const closeForm = () => {
     setShowAdd(false); setShowEdit(false); setEditItem(null)
     setForm({ bc: '', name: '', cat: '', loc: '', price: 0, note: '' })
     setNameSuggest([])
-    fetchAll()
+    setIsSubmitting(false); setHasSubmitted(false)
+  }
+
+  const continueAdd = () => {
+    setForm({ bc: '', name: '', cat: categories[0] || '', loc: '', price: 0, note: '' })
+    setNameSuggest([])
+    setHasSubmitted(false)
   }
 
   const delItem = async (id) => {
@@ -176,17 +198,20 @@ export default function App() {
   const openAddSame = (g) => {
     setForm({ bc: g.bc, name: g.name, cat: g.cat, loc: '', price: g.items[0]?.price || 0, note: '' })
     setAddPreset(g); setShowAdd(true)
+    setIsSubmitting(false); setHasSubmitted(false)
   }
 
   const openAdd = () => {
     setForm({ bc: '', name: '', cat: categories[0] || '', loc: '', price: 0, note: '' })
     setAddPreset(null); setShowAdd(true)
+    setIsSubmitting(false); setHasSubmitted(false)
   }
 
   const openEdit = (item) => {
     setEditItem(item)
     setForm({ bc: item.bc, name: item.name, cat: item.cat, loc: item.loc, price: item.price, note: item.note || '' })
     setShowEdit(true)
+    setIsSubmitting(false); setHasSubmitted(false)
   }
 
   const kinds = new Set(items.map(i => i.name + '_' + (i.bc || ''))).size
@@ -257,7 +282,7 @@ export default function App() {
 
       <div className="toolbar">
         <input type="text" placeholder={'\u7269\u54c1\u540d\u30fb\u30d0\u30fc\u30b3\u30fc\u30c9\u3067\u691c\u7d22...'} value={search} onChange={e => { setSearch(e.target.value); setPage(0) }} />
-        <button className="scan-btn" onClick={() => { setScanTarget('search'); setShowScanner(true) }}>{'\ud83d\udcf7 \u30b9\u30ad\u30e3\u30f3'}</button>
+        <button className="scan-btn" onClick={() => { openScanner("search") }}>{'\ud83d\udcf7 \u30b9\u30ad\u30e3\u30f3'}</button>
         <select value={catFilter} onChange={e => { setCatFilter(e.target.value); setPage(0) }}>
           <option value="">{'\u5168\u30ab\u30c6\u30b4\u30ea'}</option>
           {categories.map(c => <option key={c} value={c}>{c}</option>)}
@@ -336,20 +361,20 @@ export default function App() {
       )}
       {totalGroups <= PAGE && <div className="pager"><span>{totalGroups + '\u7a2e\u985e / ' + items.length + '\u70b9'}</span></div>}
 
-      {showScanner && <BarcodeScanner onScan={handleScan} onClose={() => setShowScanner(false)} />}
+      {showScanner && <BarcodeScanner onScan={handleScan} onClose={handleScanClose} />}
 
-      {(showAdd || showEdit) && (
-        <div className="modal-bg" onClick={e => { if (e.target.className === 'modal-bg') { setShowAdd(false); setShowEdit(false); setNameSuggest([]) } }}>
+      {(showAdd || showEdit) && !formHidden && (
+        <div className="modal-bg" onClick={e => { if (e.target.className === 'modal-bg') closeForm() }}>
           <div className="modal">
             <div className="modal-header">
               <h2>{showEdit ? '\u7269\u54c1\u7de8\u96c6' : addPreset ? '\u8ffd\u52a0\u767b\u9332\uff08\u540c\u4e00\u7269\u54c1\uff09' : '\u65b0\u898f\u7269\u54c1\u767b\u9332'}</h2>
-              <button className="modal-close" onClick={() => { setShowAdd(false); setShowEdit(false); setNameSuggest([]) }}>{'\u2715'}</button>
+              <button className="modal-close" onClick={closeForm}>{'\u2715'}</button>
             </div>
             <div className="field">
               <label>{'\u30d0\u30fc\u30b3\u30fc\u30c9'}</label>
               <div style={{ display: 'flex', gap: 6 }}>
                 <input type="text" value={form.bc} onChange={e => setForm(f => ({ ...f, bc: e.target.value }))} placeholder={'\u30d0\u30fc\u30b3\u30fc\u30c9\u756a\u53f7\uff08\u4efb\u610f\uff09'} style={{ flex: 1 }} />
-                <button className="scan-btn" onClick={() => { setScanTarget('form'); setShowScanner(true) }}>{'\ud83d\udcf7'}</button>
+                <button className="scan-btn" onClick={() => { openScanner("form") }}>{'\ud83d\udcf7'}</button>
               </div>
             </div>
             <div className="field" style={{ position: 'relative' }}>
@@ -386,9 +411,26 @@ export default function App() {
               <textarea value={form.note} onChange={e => setForm(f => ({ ...f, note: e.target.value }))} placeholder={'\u81ea\u7531\u8a18\u5165'} rows={2} />
             </div>
             <p className="hint">{'\u203b \u767b\u9332\u3054\u3068\u306b\u56fa\u6709ID\u304c\u5272\u308a\u5f53\u3066\u3089\u308c\u307e\u3059\uff081\u767b\u9332=1\u70b9\uff09'}</p>
+            {hasSubmitted && !showEdit && (
+              <div className="success-msg">{'\u2713 \u767b\u9332\u3057\u307e\u3057\u305f'}</div>
+            )}
             <div className="modal-actions">
-              <button className="btn" onClick={() => { setShowAdd(false); setShowEdit(false); setNameSuggest([]) }}>{'\u30ad\u30e3\u30f3\u30bb\u30eb'}</button>
-              <button className="btn primary" onClick={saveItem}>{showEdit ? '\u66f4\u65b0' : '\u767b\u9332'}</button>
+              <button className="btn" onClick={closeForm}>{hasSubmitted && !showEdit ? '\u9589\u3058\u308b' : '\u30ad\u30e3\u30f3\u30bb\u30eb'}</button>
+              {hasSubmitted && !showEdit ? (
+                <button className="btn primary" onClick={continueAdd}>{'\u7d9a\u3051\u3066\u767b\u9332'}</button>
+              ) : (
+                <button
+                  className="btn primary"
+                  disabled={isSubmitting || hasSubmitted}
+                  onClick={saveItem}
+                >
+                  {isSubmitting
+                    ? (showEdit ? '\u66f4\u65b0\u4e2d...' : '\u767b\u9332\u4e2d...')
+                    : hasSubmitted
+                      ? '\u767b\u9332\u6e08\u307f'
+                      : (showEdit ? '\u66f4\u65b0' : '\u767b\u9332')}
+                </button>
+              )}
             </div>
           </div>
         </div>

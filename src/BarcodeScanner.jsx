@@ -1,35 +1,47 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useCallback } from 'react'
 import { Html5Qrcode } from 'html5-qrcode'
 
 export default function BarcodeScanner({ onScan, onClose }) {
   const scannerRef = useRef(null)
+  const scannedRef = useRef(false)
 
-  useEffect(() => {
-    const scanner = new Html5Qrcode('barcode-reader')
-    scannerRef.current = scanner
-
-    scanner.start(
-      { facingMode: 'environment' },
-      { fps: 10, qrbox: { width: 250, height: 150 } },
-      (decodedText) => {
-        onScan(decodedText)
-        scanner.stop().catch(() => {})
-      },
-      () => {}
-    ).catch(() => {})
-
-    return () => {
-      scanner.stop().catch(() => {})
+  const handleDetected = useCallback((decodedText) => {
+    if (scannedRef.current) return
+    scannedRef.current = true
+    const scanner = scannerRef.current
+    if (scanner) {
+      scanner.stop().then(() => onScan(decodedText)).catch(() => onScan(decodedText))
+    } else {
+      onScan(decodedText)
     }
   }, [onScan])
 
+  useEffect(() => {
+    let mounted = true
+    const scanner = new Html5Qrcode('barcode-reader')
+    scannerRef.current = scanner
+    scanner.start(
+      { facingMode: 'environment' },
+      { fps: 10, qrbox: { width: 250, height: 150 } },
+      (decodedText) => { if (mounted) handleDetected(decodedText) },
+      () => {}
+    ).catch((err) => console.error('カメラ起動エラー:', err))
+    return () => { mounted = false; scanner.stop().catch(() => {}) }
+  }, [handleDetected])
+
+  const handleClose = () => {
+    const scanner = scannerRef.current
+    if (scanner) { scanner.stop().then(() => onClose()).catch(() => onClose()) }
+    else { onClose() }
+  }
+
   return (
-    <div className="modal-bg" onClick={e => { if (e.target.className === 'modal-bg') onClose() }}>
+    <div className="modal-bg" style={{ zIndex: 1100 }} onClick={e => { if (e.target.className === 'modal-bg') handleClose() }}>
       <div className="modal" style={{ maxWidth: 360 }}>
         <h2>バーコードをカメラに向けてください</h2>
         <div id="barcode-reader" style={{ marginTop: '1rem', borderRadius: 8, overflow: 'hidden' }}></div>
         <div className="modal-actions" style={{ marginTop: '1rem' }}>
-          <button className="btn" onClick={onClose}>キャンセル</button>
+          <button className="btn" onClick={handleClose}>キャンセル</button>
         </div>
       </div>
     </div>
